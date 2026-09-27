@@ -9,6 +9,7 @@ import android.widget.EditText
 import android.widget.Spinner
 import android.widget.Switch
 import android.widget.Toast
+import androidx.annotation.StringRes
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import java.text.SimpleDateFormat
@@ -41,7 +42,7 @@ class EditTransactionAct : AppCompatActivity() {
 
         val transaction = dbHelper.getTransactionById(transactionId)
         if (transaction == null) {
-            Toast.makeText(this, "Không tìm thấy giao dịch", Toast.LENGTH_SHORT).show()
+            showMessage(R.string.msg_transaction_not_found)
             finish()
             return
         }
@@ -71,7 +72,7 @@ class EditTransactionAct : AppCompatActivity() {
         categorySpinner.adapter = ArrayAdapter(
             this,
             android.R.layout.simple_spinner_item,
-            listOf("-- Chọn --") + categories.map { it.name }
+            listOf(getString(R.string.spinner_choose)) + categories.map { it.name }
         ).apply { setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item) }
         val targetId = selectedCategoryId ?: originalTransaction?.takeIf { it.typeId == typeId }?.categoryId
         val selectedIndex = categories.indexOfFirst { it.id == targetId }
@@ -97,9 +98,9 @@ class EditTransactionAct : AppCompatActivity() {
         val amount = amountInput.text.toString().trim().replace(',', '.').toDoubleOrNull()
         val databaseDate = parseDatabaseDate()
         when {
-            categoryPosition <= 0 -> showMessage("Hãy chọn mục thu/chi")
-            amount == null || amount <= 0 -> showMessage("Số tiền phải lớn hơn 0")
-            databaseDate == null -> showMessage("Hãy chọn ngày hợp lệ")
+            categoryPosition <= 0 -> showMessage(R.string.msg_choose_category)
+            amount == null || amount <= 0 -> showMessage(R.string.msg_amount_positive)
+            databaseDate == null -> showMessage(R.string.msg_invalid_date)
             else -> {
                 val category = categories[categoryPosition - 1]
                 dbHelper.updateTransaction(
@@ -112,13 +113,13 @@ class EditTransactionAct : AppCompatActivity() {
 
     private fun confirmDelete() {
         AlertDialog.Builder(this)
-            .setMessage("Xóa giao dịch này?")
-            .setPositiveButton("Xóa") { _, _ ->
+            .setMessage(R.string.dialog_delete_transaction)
+            .setPositiveButton(R.string.action_delete) { _, _ ->
                 val date = originalTransaction?.date ?: return@setPositiveButton
                 dbHelper.deleteTransaction(transactionId)
                 returnToHome(date, null)
             }
-            .setNegativeButton("Hủy", null)
+            .setNegativeButton(R.string.action_cancel, null)
             .show()
     }
 
@@ -136,7 +137,7 @@ class EditTransactionAct : AppCompatActivity() {
         finish()
     }
 
-    private fun showMessage(message: String) =
+    private fun showMessage(@StringRes message: Int) =
         Toast.makeText(this, message, Toast.LENGTH_SHORT).show()
 
     override fun onDestroy() {

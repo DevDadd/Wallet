@@ -4,7 +4,8 @@
     android:layout_height="match_parent"
     android:background="#FFFFFF"
     android:fillViewport="true"
-    android:id="@+id/editCategory">
+    android:id="@+id/editCategory"
+    android:fitsSystemWindows="true">
 
     <LinearLayout
         android:layout_width="match_parent"
@@ -59,7 +60,7 @@
             <TextView
                 android:layout_width="120dp"
                 android:layout_height="wrap_content"
-                android:text="Mục\nthu/chi:"
+                android:text="Mục\nthu/chi cha:"
                 android:textSize="22sp" />
 
             <Spinner
@@ -150,6 +151,7 @@
 
             <Spinner
                 android:id="@+id/spinnerCategoryLogo"
+                android:entries="@array/category_logos"
                 android:layout_width="0dp"
                 android:layout_height="56dp"
                 android:layout_weight="1"
@@ -161,40 +163,55 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="44dp"
+            android:baselineAligned="false"
             android:orientation="horizontal">
 
             <Button
                 android:id="@+id/btnSaveTransaction"
-                android:layout_width="51dp"
-                android:layout_height="match_parent"
+                android:layout_width="0dp"
+                android:layout_height="56dp"
                 android:layout_weight="1"
                 android:background="@android:color/transparent"
-                android:text="Thêm"
+                android:maxLines="1"
+                android:minWidth="0dp"
+                android:paddingStart="4dp"
+                android:paddingEnd="4dp"
+                android:text="Lưu"
+                android:textAllCaps="false"
                 android:textColor="#000000"
-                android:textSize="24sp"
+                android:textSize="18sp"
                 android:textStyle="bold" />
 
             <Button
                 android:id="@+id/btnDelete"
                 android:layout_width="0dp"
-                android:layout_height="wrap_content"
+                android:layout_height="56dp"
                 android:layout_weight="1"
                 android:background="@android:color/transparent"
-                android:text="Xoá"
+                android:maxLines="1"
+                android:minWidth="0dp"
+                android:paddingStart="4dp"
+                android:paddingEnd="4dp"
+                android:text="Xóa"
+                android:textAllCaps="false"
                 android:textColor="#000000"
-                android:textSize="24sp"
+                android:textSize="18sp"
                 android:textStyle="bold" />
 
             <Button
                 android:id="@+id/btnCancelTransaction"
                 android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_marginStart="24dp"
+                android:layout_height="56dp"
                 android:layout_weight="1"
                 android:background="@android:color/transparent"
+                android:maxLines="1"
+                android:minWidth="0dp"
+                android:paddingStart="4dp"
+                android:paddingEnd="4dp"
                 android:text="Hủy"
+                android:textAllCaps="false"
                 android:textColor="#000000"
-                android:textSize="24sp"
+                android:textSize="18sp"
                 android:textStyle="bold" />
         </LinearLayout>
     </LinearLayout>

@@ -1,10 +1,8 @@
-    package ptit.e23cnpm01.nguyenquanganh.mywallet
+package ptit.e23cnpm01.nguyenquanganh.mywallet
 
 import android.content.Intent
 import android.os.Bundle
-import android.graphics.Color
-import android.view.Gravity
-import android.widget.Button
+import android.view.View
 import android.widget.ImageButton
 import android.widget.ImageView
 import android.widget.LinearLayout
@@ -12,14 +10,12 @@ import android.widget.TextView
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
-import androidx.core.view.ViewCompat
-import androidx.core.view.WindowInsetsCompat
 import java.math.RoundingMode
+import java.text.Collator
 import java.text.DecimalFormat
 import java.text.DecimalFormatSymbols
 import java.text.NumberFormat
 import java.text.SimpleDateFormat
-import java.text.Collator
 import java.util.Date
 import java.util.Locale
 
@@ -28,29 +24,39 @@ class HomePageAct : AppCompatActivity() {
     lateinit var totalIncome: TextView
     lateinit var totalOutcome: TextView
     lateinit var dbHelper: DBHelper
+    private lateinit var titleView: TextView
+    private lateinit var listContainer: LinearLayout
+
     private val expandedCategoryIds = mutableSetOf<Long>()
     private var useFrequencyOrder = false
     private var displayedDatabaseDate: String? = null
     private var selectedCategoryId: Long? = null
 
+    private var categories: List<WalletCategory> = emptyList()
+    private var amountsByCategory: Map<Long, Double> = emptyMap()
+    private var usageCountsByCategory: Map<Long, Int> = emptyMap()
+    private var transactionsByCategory: Map<Long, List<WalletTransaction>> = emptyMap()
+
+    private val vietnamLocale = Locale("vi", "VN")
+    private val databaseDateFormat = SimpleDateFormat("yyyy-MM-dd", Locale.US)
+    private val displayDateFormat = SimpleDateFormat("dd/MM/yyyy", vietnamLocale)
+    private val integerFormat = NumberFormat.getIntegerInstance(vietnamLocale)
+    private val shortAmountFormat = DecimalFormat("0", DecimalFormatSymbols(vietnamLocale))
+        .apply { roundingMode = RoundingMode.HALF_UP }
+    private val collator = Collator.getInstance(vietnamLocale)
+    private val byName = Comparator<WalletCategory> { first, second ->
+        collator.compare(first.name, second.name)
+    }
+
     private val addTransactionLauncher = registerForActivityResult(
         ActivityResultContracts.StartActivityForResult()
     ) { result ->
         if (result.resultCode != RESULT_OK) return@registerForActivityResult
-
-        val data = result.data
-        val savedDate = data?.getStringExtra(AddTransactionAct.EXTRA_TRANSACTION_DATE) ?: return@registerForActivityResult
-        displayedDatabaseDate = savedDate
-        getSharedPreferences(PREFERENCES_NAME, MODE_PRIVATE).edit()
-            .putString(KEY_DISPLAYED_DATE, savedDate)
-            .apply()
-
-        val categoryId = data.getLongExtra(AddTransactionAct.EXTRA_CATEGORY_ID, -1L)
-        if (categoryId > 0) {
-            selectedCategoryId = categoryId
-            expandedCategoryIds.addAll(dbHelper.getParentCategoryIds(categoryId))
-        }
-        showTodaySummary()
+        val data = result.data ?: return@registerForActivityResult
+        val savedDate = data.getStringExtra(AddTransactionAct.EXTRA_TRANSACTION_DATE)
+            ?: return@registerForActivityResult
+        showDate(savedDate)
+        selectCategory(data.getLongExtra(AddTransactionAct.EXTRA_CATEGORY_ID, -1L))
     }
 
     private val editTransactionLauncher = registerForActivityResult(
@@ -58,17 +64,9 @@ class HomePageAct : AppCompatActivity() {
     ) { result ->
         if (result.resultCode != RESULT_OK) return@registerForActivityResult
         val data = result.data
-        val changedDate = data?.getStringExtra(AddTransactionAct.EXTRA_TRANSACTION_DATE)
-        if (changedDate != null) {
-            displayedDatabaseDate = changedDate
-            getSharedPreferences(PREFERENCES_NAME, MODE_PRIVATE).edit()
-                .putString(KEY_DISPLAYED_DATE, changedDate)
-                .apply()
-        }
-        selectedCategoryId = data?.getLongExtra(AddTransactionAct.EXTRA_CATEGORY_ID, -1L)
-            ?.takeIf { it > 0 }
-        selectedCategoryId?.let { expandedCategoryIds.addAll(dbHelper.getParentCategoryIds(it)) }
-        showTodaySummary()
+        data?.getStringExtra(AddTransactionAct.EXTRA_TRANSACTION_DATE)?.let(::showDate)
+        selectedCategoryId = null
+        selectCategory(data?.getLongExtra(AddTransactionAct.EXTRA_CATEGORY_ID, -1L) ?: -1L)
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -78,13 +76,13 @@ class HomePageAct : AppCompatActivity() {
         setContentView(R.layout.home_page)
 
         dbHelper = DBHelper(this)
-        val preferences = getSharedPreferences(PREFERENCES_NAME, MODE_PRIVATE)
-        useFrequencyOrder = preferences
-            .getBoolean(KEY_HAS_OPENED_CATEGORY_LIST, false)
-        displayedDatabaseDate = preferences.getString(KEY_DISPLAYED_DATE, null)
+        useFrequencyOrder = dbHelper.getHasOpenedCategoryList()
+        displayedDatabaseDate = dbHelper.getDisplayedDate()
 
+        titleView = findViewById(R.id.title)
         totalIncome = findViewById(R.id.totalIncome)
         totalOutcome = findViewById(R.id.totalOutcome)
+        listContainer = findViewById(R.id.transactionList)
 
         findViewById<TextView>(R.id.addTransactionButton).setOnClickListener {
             addTransactionLauncher.launch(
@@ -92,281 +90,174 @@ class HomePageAct : AppCompatActivity() {
                     .putExtra(AddTransactionAct.EXTRA_INITIAL_DATE, displayedDatabaseDate)
             )
         }
-
-        ViewCompat.setOnApplyWindowInsetsListener(
-            findViewById(R.id.homepage)
-        ) { v, insets ->
-
-            val systemBars =
-                insets.getInsets(WindowInsetsCompat.Type.systemBars())
-
-            v.setPadding(
-                systemBars.left,
-                systemBars.top,
-                systemBars.right,
-                systemBars.bottom
-            )
-
-            insets
-        }
-
-        // Nạp dữ liệu ngay ở lần đầu mở trang chủ.
-        showTodaySummary()
     }
 
     override fun onResume() {
         super.onResume()
 
         showTodaySummary()
-        getSharedPreferences(PREFERENCES_NAME, MODE_PRIVATE).edit()
-            .putBoolean(KEY_HAS_OPENED_CATEGORY_LIST, true)
-            .apply()
+        if (!useFrequencyOrder) dbHelper.setHasOpenedCategoryList(true)
+    }
+
+    private fun showDate(date: String) {
+        displayedDatabaseDate = date
+        dbHelper.setDisplayedDate(date)
+    }
+
+    private fun selectCategory(categoryId: Long) {
+        if (categoryId <= 0) return
+        selectedCategoryId = categoryId
+        expandedCategoryIds.addAll(dbHelper.getParentCategoryIds(categoryId))
     }
 
     private fun showTodaySummary() {
-        val today = displayedDatabaseDate
-            ?: SimpleDateFormat("yyyy-MM-dd", Locale.US).format(Date())
+        val today = displayedDatabaseDate ?: databaseDateFormat.format(Date())
         displayedDatabaseDate = today
-        val displayedDate = SimpleDateFormat("yyyy-MM-dd", Locale.US)
-            .parse(today)
-            ?.let { SimpleDateFormat("dd/MM/yyyy", Locale("vi", "VN")).format(it) }
+        val displayedDate = runCatching { databaseDateFormat.parse(today) }.getOrNull()
+            ?.let { displayDateFormat.format(it) }
             ?: today
 
-        val total = dbHelper.getTotalIncomeByDate(today)
-        val outcome = dbHelper.getTotalExpenseByDate(today)
+        titleView.text = getString(R.string.home_title_date, displayedDate)
+        totalIncome.text = getString(R.string.home_total_income, formatAmount(dbHelper.getTotalIncomeByDate(today)))
+        totalOutcome.text = getString(R.string.home_total_expense, formatAmount(dbHelper.getTotalExpenseByDate(today)))
 
-        findViewById<TextView>(R.id.title).text = "Ngày $displayedDate"
-        totalIncome.text = "Tổng thu của ngày\n${formatAmount(total)}"
-        totalOutcome.text = "Tổng chi của ngày\n${formatAmount(outcome)}"
+        categories = dbHelper.getCategoriesByType(DBHelper.TYPE_INCOME) +
+            dbHelper.getCategoriesByType(DBHelper.TYPE_EXPENSE)
+        amountsByCategory = dbHelper.getCategoryAmountsIncludingChildrenByDate(today)
+        usageCountsByCategory = dbHelper.getCategoryUsageCounts()
+        transactionsByCategory = dbHelper.getTransactionsByDate(today).groupBy { it.categoryId }
 
-        showCategoryLists(
-            incomes = dbHelper.getCategoriesByType(DBHelper.TYPE_INCOME),
-            expenses = dbHelper.getCategoriesByType(DBHelper.TYPE_EXPENSE),
-            amountsByCategory = dbHelper.getCategoryAmountsIncludingChildrenByDate(today),
-            usageCountsByCategory = dbHelper.getCategoryUsageCounts(),
-            transactions = dbHelper.getTransactionsByDate(today)
-        )
+        renderCategoryList()
     }
 
-    private fun showCategoryLists(
-        incomes: List<WalletCategory>,
-        expenses: List<WalletCategory>,
-        amountsByCategory: Map<Long, Double>,
-        usageCountsByCategory: Map<Long, Int>,
-        transactions: List<WalletTransaction>
-    ) {
-        val listContainer = findViewById<LinearLayout>(R.id.transactionList)
+    private fun renderCategoryList() {
         listContainer.removeAllViews()
 
-        if (incomes.isEmpty() && expenses.isEmpty()) {
-            listContainer.addView(TextView(this).apply {
-                text = "Chưa có danh mục"
-                textSize = 16f
-                gravity = Gravity.CENTER
-                setTextColor(Color.GRAY)
-                setPadding(0, dp(24), 0, dp(24))
-            })
+        if (categories.isEmpty()) {
+            layoutInflater.inflate(R.layout.item_home_no_category, listContainer, true)
             return
         }
-        addCategoryItems(
-            categories = incomes + expenses,
-            amountsByCategory = amountsByCategory,
-            usageCountsByCategory = usageCountsByCategory,
-            transactions = transactions,
-            listContainer = listContainer
-        )
-    }
 
-    private fun addCategoryItems(
-        categories: List<WalletCategory>,
-        amountsByCategory: Map<Long, Double>,
-        usageCountsByCategory: Map<Long, Int>,
-        transactions: List<WalletTransaction>,
-        listContainer: LinearLayout
-    ) {
         val childrenByParent = categories.groupBy { it.parentId }
         val displayedCategoryIds = mutableSetOf<Long>()
         val usageByCategory = mutableMapOf<Long, Int>()
-        val collator = Collator.getInstance(Locale("vi", "VN"))
-
-        fun alphabetically(items: List<WalletCategory>): List<WalletCategory> =
-            items.sortedWith { first, second -> collator.compare(first.name, second.name) }
-
-        fun categoryTotal(category: WalletCategory): Double = amountsByCategory[category.id] ?: 0.0
 
         fun categoryUsage(category: WalletCategory): Int = usageByCategory.getOrPut(category.id) {
-            var usage = usageCountsByCategory[category.id] ?: 0
-            childrenByParent[category.id].orEmpty().forEach { child ->
-                usage += categoryUsage(child)
-            }
-            usage
-        }
-
-        fun addTransactionRow(transaction: WalletTransaction, level: Int, color: Int) {
-            val row = LinearLayout(this).apply {
-                layoutParams = LinearLayout.LayoutParams(
-                    LinearLayout.LayoutParams.MATCH_PARENT,
-                    LinearLayout.LayoutParams.WRAP_CONTENT
-                ).apply { bottomMargin = dp(4) }
-                gravity = Gravity.CENTER_VERTICAL
-                orientation = LinearLayout.HORIZONTAL
-                setPadding(dp(20 + level * 28), dp(4), dp(16), dp(4))
-                isClickable = true
-                isFocusable = true
-                contentDescription = "Sửa giao dịch ${transaction.note ?: transaction.categoryName}"
-                setOnClickListener {
-                    editTransactionLauncher.launch(
-                        Intent(this@HomePageAct, EditTransactionAct::class.java)
-                            .putExtra(EditTransactionAct.EXTRA_TRANSACTION_ID, transaction.id)
-                    )
-                }
-            }
-            row.addView(TextView(this).apply {
-                layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
-                text = "• ${transaction.note ?: transaction.categoryName}"
-                textSize = 15f
-                setTextColor(color)
-            })
-            row.addView(TextView(this).apply {
-                text = formatAmount(transaction.amount)
-                textSize = 15f
-                setTextColor(color)
-            })
-            listContainer.addView(row)
+            (usageCountsByCategory[category.id] ?: 0) +
+                childrenByParent[category.id].orEmpty().sumOf { categoryUsage(it) }
         }
 
         fun addCategory(category: WalletCategory, level: Int) {
             if (!displayedCategoryIds.add(category.id)) return
 
-            val row = LinearLayout(this).apply {
-                layoutParams = LinearLayout.LayoutParams(
-                    LinearLayout.LayoutParams.MATCH_PARENT,
-                    LinearLayout.LayoutParams.WRAP_CONTENT
-                ).apply { bottomMargin = dp(8) }
-                gravity = Gravity.CENTER_VERTICAL
-                orientation = LinearLayout.HORIZONTAL
-                setPadding(dp(16 + level * 28), dp(6), dp(16), dp(6))
-            }
-
             val children = childrenByParent[category.id].orEmpty()
-            val categoryColor = if (category.typeId == DBHelper.TYPE_INCOME) {
-                Color.rgb(0, 190, 0)
-            } else {
-                Color.RED
-            }
+            val categoryColor = getColor(
+                if (category.typeId == DBHelper.TYPE_INCOME) R.color.income else R.color.expense
+            )
 
-            row.addView(ImageView(this).apply {
-                layoutParams = LinearLayout.LayoutParams(dp(44), dp(44))
-                setImageResource(R.mipmap.ic_launcher)
-                contentDescription = "Biểu tượng ${category.name}"
-            })
+            listContainer.addView(createCategoryRow(category, level, categoryColor, hasChildren = children.isNotEmpty()))
 
-            row.addView(TextView(this).apply {
-                layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
-                    .apply { marginStart = dp(16) }
-                text = category.name
-                textSize = 18f
-                setTextColor(categoryColor)
-            })
-
-            if (category.parentId == null) {
-                row.addView(ImageButton(this).apply {
-                    layoutParams = LinearLayout.LayoutParams(dp(40), dp(40))
-                    setImageResource(android.R.drawable.ic_menu_edit)
-                    setBackgroundColor(Color.TRANSPARENT)
-                    contentDescription = "Sửa mục ${category.name}"
-                    setOnClickListener{
-                        val intent = Intent(this@HomePageAct, EditCategoryAct::class.java)
-                        startActivity(intent)
-                    }
-                })
-            }
-
-            row.addView(TextView(this).apply {
-                text = if (children.isEmpty()) {
-                    formatAmount(categoryTotal(category))
-                } else {
-                    "${formatAmount(categoryTotal(category))}"
-                }
-                textSize = 18f
-                gravity = Gravity.END
-                setTextColor(categoryColor)
-            })
-
-            if (children.isNotEmpty()) {
-                row.isClickable = true
-                row.isFocusable = true
-                row.setOnClickListener {
-                    if (category.id in expandedCategoryIds) {
-                        expandedCategoryIds.remove(category.id)
-                        // Đóng hẳn mục cha: không giữ lại danh sách giao dịch
-                        // trực tiếp của nó sau khi cây mục con đã được thu gọn.
-                        selectedCategoryId = null
-                    } else {
-                        expandedCategoryIds.add(category.id)
-                        selectedCategoryId = category.id
-                    }
-                    showCategoryLists(
-                        dbHelper.getCategoriesByType(DBHelper.TYPE_INCOME),
-                        dbHelper.getCategoriesByType(DBHelper.TYPE_EXPENSE),
-                        amountsByCategory, usageCountsByCategory, transactions
-                    )
-                }
-            } else {
-                row.isClickable = true
-                row.isFocusable = true
-                row.setOnClickListener {
-                    // Bấm lại đúng mục con đang chọn sẽ đóng danh sách giao dịch.
-                    selectedCategoryId = if (selectedCategoryId == category.id) null else category.id
-                    showCategoryLists(
-                        dbHelper.getCategoriesByType(DBHelper.TYPE_INCOME),
-                        dbHelper.getCategoriesByType(DBHelper.TYPE_EXPENSE),
-                        amountsByCategory, usageCountsByCategory, transactions
-                    )
-                }
-            }
-
-            listContainer.addView(row)
             if (selectedCategoryId == category.id) {
-                // Chỉ hiện khoản được gán trực tiếp cho mục đang chọn. Các khoản
-                // của Ăn sáng/Ăn trưa/Ăn tối được thể hiện ở chính mục con, tránh
-                // người dùng nhìn thấy chúng hai lần trong phần Ăn uống.
-                val categoryTransactions = transactions.filter { it.categoryId == category.id }
+                val categoryTransactions = transactionsByCategory[category.id].orEmpty()
                 if (categoryTransactions.isEmpty()) {
-                    listContainer.addView(TextView(this).apply {
-                        text = "Chưa có giao dịch"
-                        textSize = 15f
-                        setTextColor(Color.GRAY)
-                        setPadding(dp(20 + (level + 1) * 28), dp(4), dp(16), dp(4))
-                    })
+                    listContainer.addView(
+                        layoutInflater.inflate(R.layout.item_home_empty, listContainer, false)
+                            .apply { indent(level + 1) }
+                    )
                 } else {
                     categoryTransactions.forEach { transaction ->
-                        addTransactionRow(transaction, level + 1, categoryColor)
+                        listContainer.addView(createTransactionRow(transaction, level + 1, categoryColor))
                     }
                 }
             }
             if (category.id in expandedCategoryIds) {
-                alphabetically(children).forEach { child ->
-                    addCategory(child, level + 1)
-                }
+                children.sortedWith(byName).forEach { child -> addCategory(child, level + 1) }
             }
         }
 
-        val parentCategories = alphabetically(childrenByParent[null].orEmpty())
+        val parentCategories = childrenByParent[null].orEmpty().sortedWith(byName)
         val sortedParents = if (useFrequencyOrder) {
-            parentCategories.sortedWith(Comparator { first, second ->
-                val frequencyComparison = categoryUsage(second).compareTo(categoryUsage(first))
-                if (frequencyComparison != 0) frequencyComparison
-                else collator.compare(first.name, second.name)
-            })
+            parentCategories.sortedWith(
+                compareByDescending<WalletCategory> { categoryUsage(it) }.then(byName)
+            )
         } else {
             parentCategories
         }
         sortedParents.forEach { category -> addCategory(category, 0) }
     }
 
-    private fun dp(value: Int): Int =
-        (value * resources.displayMetrics.density).toInt()
+    private fun createCategoryRow(
+        category: WalletCategory,
+        level: Int,
+        color: Int,
+        hasChildren: Boolean
+    ): View = layoutInflater.inflate(R.layout.item_home_category, listContainer, false).apply {
+        indent(level)
+        setOnClickListener {
+            if (hasChildren) {
+                if (expandedCategoryIds.remove(category.id)) {
+                    selectedCategoryId = null
+                } else {
+                    expandedCategoryIds.add(category.id)
+                    selectedCategoryId = category.id
+                }
+            } else {
+                // Bấm lại đúng mục con đang chọn sẽ đóng danh sách giao dịch.
+                selectedCategoryId = if (selectedCategoryId == category.id) null else category.id
+            }
+            renderCategoryList()
+        }
+
+        findViewById<ImageView>(R.id.imgCategoryIcon).contentDescription = getString(R.string.home_category_icon_desc, category.name)
+        findViewById<TextView>(R.id.tvCategoryName).apply {
+            text = category.name
+            setTextColor(color)
+        }
+        findViewById<TextView>(R.id.tvCategoryAmount).apply {
+            text = formatAmount(amountsByCategory[category.id] ?: 0.0)
+            setTextColor(color)
+        }
+        findViewById<ImageButton>(R.id.btnEditCategory).apply {
+            contentDescription = getString(R.string.home_category_edit_desc, category.name)
+            setOnClickListener {
+                startActivity(
+                    Intent(this@HomePageAct, EditCategoryAct::class.java)
+                        .putExtra(EditCategoryAct.EXTRA_CATEGORY_ID, category.id)
+                )
+            }
+        }
+    }
+
+    private fun createTransactionRow(
+        transaction: WalletTransaction,
+        level: Int,
+        color: Int
+    ): View = layoutInflater.inflate(R.layout.item_home_transaction, listContainer, false).apply {
+        val label = transaction.note ?: transaction.categoryName
+        indent(level)
+        contentDescription = getString(R.string.home_transaction_edit_desc, label)
+        setOnClickListener {
+            editTransactionLauncher.launch(
+                Intent(this@HomePageAct, EditTransactionAct::class.java)
+                    .putExtra(EditTransactionAct.EXTRA_TRANSACTION_ID, transaction.id)
+            )
+        }
+
+        findViewById<TextView>(R.id.tvTransactionLabel).apply {
+            text = getString(R.string.home_transaction_label, label)
+            setTextColor(color)
+        }
+        findViewById<TextView>(R.id.tvTransactionAmount).apply {
+            text = formatAmount(transaction.amount)
+            setTextColor(color)
+        }
+    }
+
+    /** Thụt lề theo cấp danh mục, cộng thêm vào padding gốc trong XML. */
+    private fun View.indent(level: Int) {
+        val step = resources.getDimensionPixelSize(R.dimen.category_indent)
+        setPaddingRelative(paddingStart + level * step, paddingTop, paddingEnd, paddingBottom)
+    }
 
     private fun formatAmount(amount: Double): String {
         val absoluteAmount = kotlin.math.abs(amount)
@@ -374,25 +265,13 @@ class HomePageAct : AppCompatActivity() {
             absoluteAmount >= 1_000_000_000 -> amount / 1_000_000_000 to "B"
             absoluteAmount >= 1_000_000 -> amount / 1_000_000 to "M"
             absoluteAmount >= 1_000 -> amount / 1_000 to "k"
-            else -> return "${NumberFormat.getIntegerInstance(Locale("vi", "VN")).format(amount)} đ"
+            else -> return getString(R.string.amount_currency, integerFormat.format(amount))
         }
-
-        return DecimalFormat(
-            "0",
-            DecimalFormatSymbols(Locale("vi", "VN"))
-        ).apply {
-            roundingMode = RoundingMode.HALF_UP
-        }.format(value) + suffix
+        return shortAmountFormat.format(value) + suffix
     }
 
     override fun onDestroy() {
         dbHelper.close()
         super.onDestroy()
-    }
-
-    companion object {
-        private const val PREFERENCES_NAME = "home_page_preferences"
-        private const val KEY_HAS_OPENED_CATEGORY_LIST = "has_opened_category_list"
-        private const val KEY_DISPLAYED_DATE = "displayed_date"
     }
 }

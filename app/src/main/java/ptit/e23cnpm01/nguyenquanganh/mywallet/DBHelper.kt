@@ -17,6 +17,7 @@ class DBHelper(context: Context) : SQLiteOpenHelper(
 
     init {
         copyDatabaseFromAssetsIfNeeded()
+        ensureSettingsTableExists()
     }
 
     override fun onCreate(db: SQLiteDatabase) = Unit
@@ -92,15 +93,32 @@ class DBHelper(context: Context) : SQLiteOpenHelper(
         }
     }
 
-    fun getCategoriesByType(typeId: Int): List<WalletCategory> {
+    fun getCategoriesByType(typeId: Int): List<WalletCategory> =
+        queryCategories("WHERE idType = ?", arrayOf(typeId.toString()))
+
+    /** Danh sách mục cha (idParent = NULL). Truyền typeId để chỉ lấy mục thu hoặc mục chi. */
+    fun getParentCategories(typeId: Int? = null): List<WalletCategory> =
+        if (typeId == null) {
+            queryCategories("WHERE idParent IS NULL")
+        } else {
+            queryCategories("WHERE idParent IS NULL AND idType = ?", arrayOf(typeId.toString()))
+        }
+
+    fun getCategoryById(categoryId: Long): WalletCategory? =
+        queryCategories("WHERE id = ?", arrayOf(categoryId.toString())).firstOrNull()
+
+    private fun queryCategories(
+        whereClause: String,
+        args: Array<String>? = null
+    ): List<WalletCategory> {
         val sql = """
-            SELECT id, name, icon, idParent, idType
+            SELECT id, name, icon, note, idParent, idType
             FROM tblCategory
-            WHERE idType = ?
+            $whereClause
             ORDER BY id
         """.trimIndent()
 
-        return readableDatabase.rawQuery(sql, arrayOf(typeId.toString())).use { cursor ->
+        return readableDatabase.rawQuery(sql, args).use { cursor ->
             buildList {
                 while (cursor.moveToNext()) {
                     val parentColumn = cursor.getColumnIndexOrThrow("idParent")
@@ -109,6 +127,7 @@ class DBHelper(context: Context) : SQLiteOpenHelper(
                             id = cursor.getLong(cursor.getColumnIndexOrThrow("id")),
                             name = cursor.getString(cursor.getColumnIndexOrThrow("name")),
                             iconName = cursor.getString(cursor.getColumnIndexOrThrow("icon")),
+                            note = cursor.getStringOrNull("note"),
                             parentId = if (cursor.isNull(parentColumn)) null else cursor.getLong(parentColumn),
                             typeId = cursor.getInt(cursor.getColumnIndexOrThrow("idType"))
                         )
@@ -118,10 +137,6 @@ class DBHelper(context: Context) : SQLiteOpenHelper(
         }
     }
 
-    /**
-     * Tổng tiền của từng danh mục, đã gồm toàn bộ danh mục con ở mọi cấp.
-     * Tính trong SQLite để số ở mục cha luôn nhất quán với tổng Chi/Thu.
-     */
     fun getCategoryAmountsIncludingChildrenByDate(date: String): Map<Long, Double> {
         val sql = """
             WITH RECURSIVE category_tree(root_id, category_id) AS (
@@ -174,14 +189,12 @@ class DBHelper(context: Context) : SQLiteOpenHelper(
         }
     }
 
-    /** Ngày có giao dịch gần nhất, định dạng yyyy-MM-dd. */
     fun getLatestTransactionDate(): String? =
         readableDatabase.rawQuery("SELECT MAX(date) AS latest_date FROM tblTransaction", null)
             .use { cursor ->
                 if (cursor.moveToFirst() && !cursor.isNull(0)) cursor.getString(0) else null
             }
 
-    /** Các id danh mục cha, từ cha gần nhất đến danh mục gốc. */
     fun getParentCategoryIds(categoryId: Long): List<Long> {
         val parentIds = mutableListOf<Long>()
         var currentId = categoryId
@@ -247,6 +260,26 @@ class DBHelper(context: Context) : SQLiteOpenHelper(
         }
     )
 
+    fun updateCategory(
+        categoryId: Long,
+        name: String,
+        iconName: String,
+        note: String?,
+        parentId: Long?,
+        typeId: Int
+    ): Int = writableDatabase.update(
+        "tblCategory",
+        ContentValues().apply {
+            put("name", name)
+            put("icon", iconName)
+            put("note", note)
+            if (parentId == null) putNull("idParent") else put("idParent", parentId)
+            put("idType", typeId)
+        },
+        "id = ?",
+        arrayOf(categoryId.toString())
+    )
+
     fun updateTransaction(
         transactionId: Long,
         amount: Double,
@@ -264,6 +297,41 @@ class DBHelper(context: Context) : SQLiteOpenHelper(
         "id = ?",
         arrayOf(transactionId.toString())
     )
+
+    /**
+     * Xóa mục theo id, kèm toàn bộ mục con ở mọi cấp và các giao dịch thuộc những mục đó.
+     * Trả về số mục đã xóa (0 nếu không tìm thấy mục).
+     */
+    fun deleteCategory(categoryId: Long): Int {
+        val sql = """
+            WITH RECURSIVE category_tree(id) AS (
+                SELECT id FROM tblCategory WHERE id = ?
+                UNION ALL
+                SELECT child.id
+                FROM tblCategory AS child
+                INNER JOIN category_tree ON child.idParent = category_tree.id
+            )
+            SELECT id FROM category_tree
+        """.trimIndent()
+
+        val db = writableDatabase
+        val categoryIds = db.rawQuery(sql, arrayOf(categoryId.toString())).use { cursor ->
+            buildList { while (cursor.moveToNext()) add(cursor.getLong(0).toString()) }
+        }
+        if (categoryIds.isEmpty()) return 0
+
+        val placeholders = categoryIds.joinToString(",") { "?" }
+        val args = categoryIds.toTypedArray()
+        db.beginTransaction()
+        try {
+            db.delete("tblTransaction", "idCategory IN ($placeholders)", args)
+            val deletedCategories = db.delete("tblCategory", "id IN ($placeholders)", args)
+            db.setTransactionSuccessful()
+            return deletedCategories
+        } finally {
+            db.endTransaction()
+        }
+    }
 
     fun deleteTransaction(transactionId: Long): Int = writableDatabase.delete(
         "tblTransaction",
@@ -283,31 +351,57 @@ class DBHelper(context: Context) : SQLiteOpenHelper(
         }
     }
 
+    private fun ensureSettingsTableExists() {
+        writableDatabase.execSQL(
+            """
+            CREATE TABLE IF NOT EXISTS tblSetting (
+                settingKey TEXT PRIMARY KEY,
+                settingValue TEXT
+            )
+            """.trimIndent()
+        )
+    }
+
+    fun getSetting(key: String): String? =
+        readableDatabase.rawQuery(
+            "SELECT settingValue FROM tblSetting WHERE settingKey = ?",
+            arrayOf(key)
+        ).use { cursor -> if (cursor.moveToFirst()) cursor.getString(0) else null }
+
+    fun setSetting(key: String, value: String) {
+        writableDatabase.insertWithOnConflict(
+            "tblSetting",
+            null,
+            ContentValues().apply {
+                put("settingKey", key)
+                put("settingValue", value)
+            },
+            SQLiteDatabase.CONFLICT_REPLACE
+        )
+    }
+
+    fun getDisplayedDate(): String? = getSetting(SETTING_DISPLAYED_DATE)
+
+    fun setDisplayedDate(date: String) = setSetting(SETTING_DISPLAYED_DATE, date)
+
+    fun getHasOpenedCategoryList(): Boolean = getSetting(SETTING_HAS_OPENED_CATEGORY_LIST) == "1"
+
+    fun setHasOpenedCategoryList(value: Boolean) =
+        setSetting(SETTING_HAS_OPENED_CATEGORY_LIST, if (value) "1" else "0")
+
     companion object {
         private const val DATABASE_NAME = "mywallet.db"
         private const val DATABASE_VERSION = 1
+
+        private const val SETTING_DISPLAYED_DATE = "displayed_date"
+        private const val SETTING_HAS_OPENED_CATEGORY_LIST = "has_opened_category_list"
 
         const val TYPE_INCOME = 1
         const val TYPE_EXPENSE = 2
     }
 }
 
-data class WalletTransaction(
-    val id: Long,
-    val date: String,
-    val categoryName: String,
-    val amount: Double,
-    val note: String?,
-    val categoryId: Long,
-    val typeId: Int,
-    val typeName: String
-)
-
-/** Một danh mục có thể là danh mục cha hoặc danh mục con qua [parentId]. */
-data class WalletCategory(
-    val id: Long,
-    val name: String,
-    val iconName: String,
-    val parentId: Long?,
-    val typeId: Int
-)
+private fun android.database.Cursor.getStringOrNull(column: String): String? {
+    val index = getColumnIndexOrThrow(column)
+    return if (isNull(index)) null else getString(index)
+}

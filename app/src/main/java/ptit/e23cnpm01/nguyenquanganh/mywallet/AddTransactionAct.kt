@@ -11,6 +11,7 @@ import android.widget.Switch
 import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.annotation.StringRes
 import androidx.appcompat.app.AppCompatActivity
 import java.text.SimpleDateFormat
 import java.util.Calendar
@@ -57,8 +58,6 @@ class AddTransactionAct : AppCompatActivity() {
         btnAdd = findViewById(R.id.btnSaveTransaction)
         btnCancel = findViewById(R.id.btnCancelTransaction)
         lateinit var btnAddCategory: TextView
-        // Form và trang chủ luôn dùng cùng một ngày đang được xem. Nếu mở form
-        // trực tiếp thì mặc định vẫn là hôm nay.
         intent.getStringExtra(EXTRA_INITIAL_DATE)?.let(::setSelectedDate)
             ?: setSelectedDate(SimpleDateFormat("yyyy-MM-dd", Locale.US).format(selectedDateTime.time))
 
@@ -117,7 +116,7 @@ class AddTransactionAct : AppCompatActivity() {
             DBHelper.TYPE_EXPENSE
         }
         displayedCategories = dbHelper.getCategoriesByType(typeId)
-        val categoryNames = listOf("-- Chọn --") + displayedCategories.map { it.name }
+        val categoryNames = listOf(getString(R.string.spinner_choose)) + displayedCategories.map { it.name }
 
         categorySpinner.adapter = ArrayAdapter(
             this,
@@ -131,13 +130,13 @@ class AddTransactionAct : AppCompatActivity() {
     private fun saveTransaction() {
         val categoryPosition = categorySpinner.selectedItemPosition
         if (categoryPosition <= 0) {
-            showMessage("Hãy chọn mục thu/chi")
+            showMessage(R.string.msg_choose_category)
             return
         }
 
         val amount = moneyAmount.text.toString().trim().replace(',', '.').toDoubleOrNull()
         if (amount == null || amount <= 0) {
-            showMessage("Số tiền phải lớn hơn 0")
+            showMessage(R.string.msg_amount_positive)
             return
         }
 
@@ -151,7 +150,7 @@ class AddTransactionAct : AppCompatActivity() {
             null
         }
         if (databaseDate == null) {
-            showMessage("Hãy chọn ngày hợp lệ")
+            showMessage(R.string.msg_invalid_date)
             return
         }
 
@@ -172,7 +171,7 @@ class AddTransactionAct : AppCompatActivity() {
         finish()
     }
 
-    private fun showMessage(message: String) {
+    private fun showMessage(@StringRes message: Int) {
         Toast.makeText(this, message, Toast.LENGTH_SHORT).show()
     }
 

@@ -11,8 +11,6 @@ import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.enableEdgeToEdge
 import androidx.appcompat.app.AppCompatActivity
-import androidx.core.view.ViewCompat
-import androidx.core.view.WindowInsetsCompat
 
 class AddCategoryAct : AppCompatActivity() {
     private lateinit var dbHelper: DBHelper
@@ -34,20 +32,10 @@ class AddCategoryAct : AppCompatActivity() {
         noteInput = findViewById(R.id.edtNote)
         logoSpinner = findViewById(R.id.spinnerCategoryLogo)
 
-        logoSpinner.adapter = ArrayAdapter(
-            this, android.R.layout.simple_spinner_item,
-            listOf("Mặc định", "food.png", "shopping.png", "salary.png", "bonus.png")
-        ).apply { setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item) }
-
         typeSwitch.setOnCheckedChangeListener { _, _ -> loadParents() }
         findViewById<Button>(R.id.btnSaveTransaction).setOnClickListener { saveCategory() }
         findViewById<Button>(R.id.btnCancelTransaction).setOnClickListener { finish() }
         loadParents()
-        ViewCompat.setOnApplyWindowInsetsListener(findViewById(R.id.addCategory)) { v, insets ->
-            val systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
-            v.setPadding(systemBars.left, systemBars.top, systemBars.right, systemBars.bottom)
-            insets
-        }
     }
 
     private fun loadParents() {
@@ -56,23 +44,33 @@ class AddCategoryAct : AppCompatActivity() {
         parentSpinner.adapter = ArrayAdapter(
             this,
             android.R.layout.simple_spinner_item,
-            listOf("-- Không chọn (tạo mục cha) --") + availableParents.map { it.name }
+            listOf(getString(R.string.spinner_no_parent)) + availableParents.map { it.name }
         ).apply { setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item) }
-        findViewById<TextView>(R.id.tvAddTransactionTitle).text =
-            if (typeSwitch.isChecked) "Thêm mục thu" else "Thêm mục chi"
-        findViewById<TextView>(R.id.tvCategoryName).text =
-            if (typeSwitch.isChecked) "Tên mục thu:" else "Tên mục chi:"
+        findViewById<TextView>(R.id.tvAddTransactionTitle).setText(
+            if (typeSwitch.isChecked) R.string.title_add_income_category else R.string.title_add_expense_category
+        )
+        findViewById<TextView>(R.id.tvCategoryName).setText(
+            if (typeSwitch.isChecked) R.string.label_income_category_name else R.string.label_expense_category_name
+        )
     }
 
     private fun saveCategory() {
         val name = nameInput.text.toString().trim()
         if (name.isBlank()) {
-            Toast.makeText(this, "Hãy nhập tên mục", Toast.LENGTH_SHORT).show()
+            Toast.makeText(this, R.string.msg_enter_category_name, Toast.LENGTH_SHORT).show()
             return
         }
         val typeId = if (typeSwitch.isChecked) DBHelper.TYPE_INCOME else DBHelper.TYPE_EXPENSE
         val position = parentSpinner.selectedItemPosition
         val parentId = if (position > 0) availableParents[position - 1].id else null
+
+        val isNameExisted = dbHelper.getCategoriesByType(typeId).any {
+            it.parentId == parentId && it.name.equals(name, ignoreCase = true)
+        }
+        if (isNameExisted) {
+            Toast.makeText(this, R.string.msg_category_name_existed, Toast.LENGTH_SHORT).show()
+            return
+        }
         val iconName = if (logoSpinner.selectedItemPosition == 0) "default.png"
             else logoSpinner.selectedItem.toString()
         val categoryId = dbHelper.addCategory(
@@ -85,8 +83,7 @@ class AddCategoryAct : AppCompatActivity() {
         setResult(RESULT_OK, Intent()
             .putExtra(EXTRA_CATEGORY_ID, categoryId)
             .putExtra(EXTRA_TYPE_ID, typeId))
-        val intent = Intent(this, HomePageAct::class.java)
-        startActivity(intent)
+        finish()
     }
 
     override fun onDestroy() {

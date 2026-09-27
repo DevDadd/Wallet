@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Khoảng thụt lề cho mỗi cấp danh mục con ở trang chủ -->
+    <dimen name="category_indent">28dp</dimen>
+</resources>

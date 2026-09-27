@@ -3,8 +3,6 @@ package ptit.e23cnpm01.nguyenquanganh.mywallet
 import android.os.Bundle
 import androidx.activity.enableEdgeToEdge
 import androidx.appcompat.app.AppCompatActivity
-import androidx.core.view.ViewCompat
-import androidx.core.view.WindowInsetsCompat
 import java.text.NumberFormat
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -15,11 +13,6 @@ class MainActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         setContentView(R.layout.home_page)
-        ViewCompat.setOnApplyWindowInsetsListener(findViewById(R.id.homepage)) { v, insets ->
-            val systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
-            v.setPadding(systemBars.left, systemBars.top, systemBars.right, systemBars.bottom)
-            insets
-        }
 
         showTodaySummary()
     }
@@ -35,11 +28,11 @@ class MainActivity : AppCompatActivity() {
             val totalIncome = dbHelper.getTotalIncomeByDate(databaseDate)
             val totalExpense = dbHelper.getTotalExpenseByDate(databaseDate)
 
-            findViewById<android.widget.TextView>(R.id.title).text = "Ngày $displayDate"
+            findViewById<android.widget.TextView>(R.id.title).text = getString(R.string.home_title_date, displayDate)
             findViewById<android.widget.TextView>(R.id.totalIncome).text =
-                "Tổng thu\n${currencyFormat.format(totalIncome)} đ"
+                getString(R.string.main_total_income, currencyFormat.format(totalIncome))
             findViewById<android.widget.TextView>(R.id.totalOutcome).text =
-                "Tổng chi\n${currencyFormat.format(totalExpense)} đ"
+                getString(R.string.main_total_expense, currencyFormat.format(totalExpense))
         } finally {
             dbHelper.close()
         }
