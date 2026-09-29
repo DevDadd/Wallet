@@ -3,7 +3,6 @@ package ptit.e23cnpm01.nguyenquanganh.mywallet
 import android.os.Bundle
 import androidx.activity.enableEdgeToEdge
 import androidx.appcompat.app.AppCompatActivity
-import java.text.NumberFormat
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -21,7 +20,6 @@ class MainActivity : AppCompatActivity() {
         // tblTransaction.date trong database có dạng yyyy-MM-dd.
         val databaseDate = SimpleDateFormat("yyyy-MM-dd", Locale.US).format(Date())
         val displayDate = SimpleDateFormat("dd/MM/yyyy", Locale("vi", "VN")).format(Date())
-        val currencyFormat = NumberFormat.getNumberInstance(Locale("vi", "VN"))
 
         val dbHelper = DBHelper(this)
         try {
@@ -30,9 +28,9 @@ class MainActivity : AppCompatActivity() {
 
             findViewById<android.widget.TextView>(R.id.title).text = getString(R.string.home_title_date, displayDate)
             findViewById<android.widget.TextView>(R.id.totalIncome).text =
-                getString(R.string.main_total_income, currencyFormat.format(totalIncome))
+                getString(R.string.main_total_income, AmountFormatter.format(totalIncome))
             findViewById<android.widget.TextView>(R.id.totalOutcome).text =
-                getString(R.string.main_total_expense, currencyFormat.format(totalExpense))
+                getString(R.string.main_total_expense, AmountFormatter.format(totalExpense))
         } finally {
             dbHelper.close()
         }

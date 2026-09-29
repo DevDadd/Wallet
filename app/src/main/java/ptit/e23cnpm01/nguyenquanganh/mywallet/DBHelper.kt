@@ -298,10 +298,7 @@ class DBHelper(context: Context) : SQLiteOpenHelper(
         arrayOf(transactionId.toString())
     )
 
-    /**
-     * Xóa mục theo id, kèm toàn bộ mục con ở mọi cấp và các giao dịch thuộc những mục đó.
-     * Trả về số mục đã xóa (0 nếu không tìm thấy mục).
-     */
+
     fun deleteCategory(categoryId: Long): Int {
         val sql = """
             WITH RECURSIVE category_tree(id) AS (

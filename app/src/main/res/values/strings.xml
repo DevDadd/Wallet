@@ -22,8 +22,8 @@
     <string name="home_transaction_edit_desc">Sửa giao dịch %1$s</string>
 
     <!-- Màn hình cũ MainActivity -->
-    <string name="main_total_income">Tổng thu\n%1$s đ</string>
-    <string name="main_total_expense">Tổng chi\n%1$s đ</string>
+    <string name="main_total_income">Tổng thu\n%1$s</string>
+    <string name="main_total_expense">Tổng chi\n%1$s</string>
 
     <!-- Sửa giao dịch -->
     <string name="msg_transaction_not_found">Không tìm thấy giao dịch</string>

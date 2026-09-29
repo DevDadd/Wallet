@@ -1,6 +1,8 @@
 package ptit.e23cnpm01.nguyenquanganh.mywallet
 
 import android.content.Intent
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import android.os.Bundle
 import android.view.View
 import android.widget.ImageButton
@@ -10,11 +12,7 @@ import android.widget.TextView
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
-import java.math.RoundingMode
 import java.text.Collator
-import java.text.DecimalFormat
-import java.text.DecimalFormatSymbols
-import java.text.NumberFormat
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -36,13 +34,11 @@ class HomePageAct : AppCompatActivity() {
     private var amountsByCategory: Map<Long, Double> = emptyMap()
     private var usageCountsByCategory: Map<Long, Int> = emptyMap()
     private var transactionsByCategory: Map<Long, List<WalletTransaction>> = emptyMap()
+    private val categoryLogoCache = mutableMapOf<String, Bitmap>()
 
     private val vietnamLocale = Locale("vi", "VN")
     private val databaseDateFormat = SimpleDateFormat("yyyy-MM-dd", Locale.US)
     private val displayDateFormat = SimpleDateFormat("dd/MM/yyyy", vietnamLocale)
-    private val integerFormat = NumberFormat.getIntegerInstance(vietnamLocale)
-    private val shortAmountFormat = DecimalFormat("0", DecimalFormatSymbols(vietnamLocale))
-        .apply { roundingMode = RoundingMode.HALF_UP }
     private val collator = Collator.getInstance(vietnamLocale)
     private val byName = Comparator<WalletCategory> { first, second ->
         collator.compare(first.name, second.name)
@@ -77,7 +73,8 @@ class HomePageAct : AppCompatActivity() {
 
         dbHelper = DBHelper(this)
         useFrequencyOrder = dbHelper.getHasOpenedCategoryList()
-        displayedDatabaseDate = dbHelper.getDisplayedDate()
+        // Mỗi lần mở ứng dụng bắt đầu từ ngày hiện tại, không khôi phục ngày xem cũ.
+        displayedDatabaseDate = databaseDateFormat.format(Date())
 
         titleView = findViewById(R.id.title)
         totalIncome = findViewById(R.id.totalIncome)
@@ -202,13 +199,21 @@ class HomePageAct : AppCompatActivity() {
                     selectedCategoryId = category.id
                 }
             } else {
-                // Bấm lại đúng mục con đang chọn sẽ đóng danh sách giao dịch.
                 selectedCategoryId = if (selectedCategoryId == category.id) null else category.id
             }
             renderCategoryList()
         }
 
-        findViewById<ImageView>(R.id.imgCategoryIcon).contentDescription = getString(R.string.home_category_icon_desc, category.name)
+        findViewById<ImageView>(R.id.imgCategoryIcon).apply {
+            contentDescription = getString(R.string.home_category_icon_desc, category.name)
+            val logo = categoryLogoCache[category.iconName] ?: runCatching {
+                assets.open(category.iconName).use { BitmapFactory.decodeStream(it) }
+            }.getOrNull()
+            if (logo != null) {
+                categoryLogoCache[category.iconName] = logo
+                setImageBitmap(logo)
+            }
+        }
         findViewById<TextView>(R.id.tvCategoryName).apply {
             text = category.name
             setTextColor(color)
@@ -253,22 +258,12 @@ class HomePageAct : AppCompatActivity() {
         }
     }
 
-    /** Thụt lề theo cấp danh mục, cộng thêm vào padding gốc trong XML. */
     private fun View.indent(level: Int) {
         val step = resources.getDimensionPixelSize(R.dimen.category_indent)
         setPaddingRelative(paddingStart + level * step, paddingTop, paddingEnd, paddingBottom)
     }
 
-    private fun formatAmount(amount: Double): String {
-        val absoluteAmount = kotlin.math.abs(amount)
-        val (value, suffix) = when {
-            absoluteAmount >= 1_000_000_000 -> amount / 1_000_000_000 to "B"
-            absoluteAmount >= 1_000_000 -> amount / 1_000_000 to "M"
-            absoluteAmount >= 1_000 -> amount / 1_000 to "k"
-            else -> return getString(R.string.amount_currency, integerFormat.format(amount))
-        }
-        return shortAmountFormat.format(value) + suffix
-    }
+    private fun formatAmount(amount: Double): String = AmountFormatter.format(amount)
 
     override fun onDestroy() {
         dbHelper.close()

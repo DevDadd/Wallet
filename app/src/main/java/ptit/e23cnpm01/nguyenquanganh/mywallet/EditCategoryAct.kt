@@ -37,6 +37,7 @@ class EditCategoryAct : AppCompatActivity() {
         catName = findViewById(R.id.edtCategoryName)
         catNote = findViewById(R.id.edtNote)
         catLogoSpinner = findViewById(R.id.spinnerCategoryLogo)
+        catLogoSpinner.adapter = LogoSpinnerAdapter(this)
         dbHelper = DBHelper(this)
         typeSwitch = findViewById(R.id.switchTransactionType)
         btnUpdate = findViewById(R.id.btnSaveTransaction)
@@ -91,8 +92,9 @@ class EditCategoryAct : AppCompatActivity() {
         catName.setText(category.name)
         catNote.setText(category.note.orEmpty())
 
-        val logoIndex = resources.getStringArray(R.array.category_logos).indexOf(category.iconName)
-        catLogoSpinner.setSelection(if (logoIndex > 0) logoIndex else 0)
+        val logoIndex = (0 until catLogoSpinner.adapter.count)
+            .firstOrNull { catLogoSpinner.adapter.getItem(it) == category.iconName } ?: 0
+        catLogoSpinner.setSelection(logoIndex)
 
         val hasChildren = dbHelper.getCategoriesByType(category.typeId).any { it.parentId == category.id }
         typeSwitch.isEnabled = !hasChildren
@@ -120,8 +122,7 @@ class EditCategoryAct : AppCompatActivity() {
             return
         }
 
-        val iconName = if (catLogoSpinner.selectedItemPosition == 0) DEFAULT_ICON
-            else catLogoSpinner.selectedItem.toString()
+        val iconName = catLogoSpinner.selectedItem.toString()
 
         val updatedRows = dbHelper.updateCategory(
             categoryId = categoryId,
@@ -160,6 +161,5 @@ class EditCategoryAct : AppCompatActivity() {
 
     companion object {
         const val EXTRA_CATEGORY_ID = "category_id"
-        private const val DEFAULT_ICON = "default.png"
     }
 }

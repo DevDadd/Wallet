@@ -31,6 +31,7 @@ class AddCategoryAct : AppCompatActivity() {
         nameInput = findViewById(R.id.edtCategoryName)
         noteInput = findViewById(R.id.edtNote)
         logoSpinner = findViewById(R.id.spinnerCategoryLogo)
+        logoSpinner.adapter = LogoSpinnerAdapter(this)
 
         typeSwitch.setOnCheckedChangeListener { _, _ -> loadParents() }
         findViewById<Button>(R.id.btnSaveTransaction).setOnClickListener { saveCategory() }
@@ -71,8 +72,7 @@ class AddCategoryAct : AppCompatActivity() {
             Toast.makeText(this, R.string.msg_category_name_existed, Toast.LENGTH_SHORT).show()
             return
         }
-        val iconName = if (logoSpinner.selectedItemPosition == 0) "default.png"
-            else logoSpinner.selectedItem.toString()
+        val iconName = logoSpinner.selectedItem.toString()
         val categoryId = dbHelper.addCategory(
             name = name,
             iconName = iconName,
