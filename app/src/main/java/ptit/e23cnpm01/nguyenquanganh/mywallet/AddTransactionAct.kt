@@ -28,6 +28,7 @@ class AddTransactionAct : AppCompatActivity() {
     private lateinit var btnAdd: Button
     private lateinit var btnCancel: Button
     private var displayedCategories: List<WalletCategory> = emptyList()
+    lateinit var btnAddCategory: TextView
 
     private val addCategoryLauncher = registerForActivityResult(
         ActivityResultContracts.StartActivityForResult()
@@ -48,7 +49,6 @@ class AddTransactionAct : AppCompatActivity() {
         dateInput = findViewById(R.id.edtTransactionDate)
         btnAdd = findViewById(R.id.btnSaveTransaction)
         btnCancel = findViewById(R.id.btnCancelTransaction)
-        lateinit var btnAddCategory: TextView
         intent.getStringExtra(EXTRA_INITIAL_DATE)?.let(::setSelectedDate)
             ?: setSelectedDate(SimpleDateFormat("yyyy-MM-dd", Locale.US).format(selectedDateTime.time))
 
