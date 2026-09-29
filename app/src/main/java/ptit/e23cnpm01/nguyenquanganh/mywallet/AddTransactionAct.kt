@@ -33,7 +33,10 @@ class AddTransactionAct : AppCompatActivity() {
     private val addCategoryLauncher = registerForActivityResult(
         ActivityResultContracts.StartActivityForResult()
     ) { result ->
-        if (result.resultCode == RESULT_OK) finish()
+        if (result.resultCode != RESULT_OK) return@registerForActivityResult
+        val categoryId = result.data?.getLongExtra(AddCategoryAct.EXTRA_CATEGORY_ID, -1L) ?: -1L
+        setResult(RESULT_OK, Intent().putExtra(EXTRA_NEW_CATEGORY_ID, categoryId))
+        finish()
     }
 
 
@@ -172,5 +175,6 @@ class AddTransactionAct : AppCompatActivity() {
         const val EXTRA_TRANSACTION_DATE = "transaction_date"
         const val EXTRA_CATEGORY_ID = "category_id"
         const val EXTRA_INITIAL_DATE = "initial_date"
+        const val EXTRA_NEW_CATEGORY_ID = "new_category_id"
     }
 }

@@ -49,6 +49,12 @@ class HomePageAct : AppCompatActivity() {
     ) { result ->
         if (result.resultCode != RESULT_OK) return@registerForActivityResult
         val data = result.data ?: return@registerForActivityResult
+        val newCategoryId = data.getLongExtra(AddTransactionAct.EXTRA_NEW_CATEGORY_ID, -1L)
+        if (newCategoryId > 0) {
+            expandedCategoryIds.addAll(dbHelper.getParentCategoryIds(newCategoryId))
+            showTodaySummary()
+            return@registerForActivityResult
+        }
         val savedDate = data.getStringExtra(AddTransactionAct.EXTRA_TRANSACTION_DATE)
             ?: return@registerForActivityResult
         showDate(savedDate)
