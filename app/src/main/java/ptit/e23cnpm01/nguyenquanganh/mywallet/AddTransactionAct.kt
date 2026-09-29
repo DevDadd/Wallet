@@ -32,16 +32,7 @@ class AddTransactionAct : AppCompatActivity() {
     private val addCategoryLauncher = registerForActivityResult(
         ActivityResultContracts.StartActivityForResult()
     ) { result ->
-        if (result.resultCode != RESULT_OK) return@registerForActivityResult
-        val data = result.data ?: return@registerForActivityResult
-        val typeId = data.getIntExtra(AddCategoryAct.EXTRA_TYPE_ID, -1)
-        val categoryId = data.getLongExtra(AddCategoryAct.EXTRA_CATEGORY_ID, -1L)
-        if (typeId == DBHelper.TYPE_INCOME || typeId == DBHelper.TYPE_EXPENSE) {
-            transactionTypeSwitch.isChecked = typeId == DBHelper.TYPE_INCOME
-            loadCategories()
-            val index = displayedCategories.indexOfFirst { it.id == categoryId }
-            if (index >= 0) categorySpinner.setSelection(index + 1)
-        }
+        if (result.resultCode == RESULT_OK) finish()
     }
 
 
@@ -67,13 +58,9 @@ class AddTransactionAct : AppCompatActivity() {
 
         btnAdd.setOnClickListener { saveTransaction() }
         btnCancel.setOnClickListener { finish() }
-        findViewById<android.widget.TextView>(R.id.btnAddCategory).setOnClickListener {
-            addCategoryLauncher.launch(Intent(this, AddCategoryAct::class.java))
-        }
         btnAddCategory = findViewById(R.id.btnAddCategory)
-        btnAddCategory.setOnClickListener{
-            val intent = Intent(this, AddCategoryAct::class.java)
-            startActivity(intent)
+        btnAddCategory.setOnClickListener {
+            addCategoryLauncher.launch(Intent(this, AddCategoryAct::class.java))
         }
 
         transactionTypeSwitch.setOnCheckedChangeListener { _, _ -> loadCategories() }
