@@ -33,6 +33,8 @@ class AddCategoryAct : AppCompatActivity() {
         logoSpinner = findViewById(R.id.spinnerCategoryLogo)
         logoSpinner.adapter = LogoSpinnerAdapter(this)
 
+        typeSwitch.isChecked = intent.getIntExtra(EXTRA_INITIAL_TYPE_ID, DBHelper.TYPE_EXPENSE) == DBHelper.TYPE_INCOME
+
         typeSwitch.setOnCheckedChangeListener { _, _ -> loadParents() }
         findViewById<Button>(R.id.btnSaveTransaction).setOnClickListener { saveCategory() }
         findViewById<Button>(R.id.btnCancelTransaction).setOnClickListener { finish() }
@@ -94,5 +96,6 @@ class AddCategoryAct : AppCompatActivity() {
     companion object {
         const val EXTRA_CATEGORY_ID = "category_id"
         const val EXTRA_TYPE_ID = "type_id"
+        const val EXTRA_INITIAL_TYPE_ID = "initial_type_id"
     }
 }

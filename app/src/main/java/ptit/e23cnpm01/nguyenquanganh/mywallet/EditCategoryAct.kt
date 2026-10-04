@@ -7,7 +7,10 @@ import android.widget.EditText
 import android.widget.Spinner
 import android.widget.Switch
 import android.widget.Toast
+import android.content.Intent
+import android.widget.TextView
 import androidx.activity.enableEdgeToEdge
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 
@@ -24,9 +27,20 @@ class EditCategoryAct : AppCompatActivity() {
     private var originalCategory: WalletCategory? = null
     private var categoryId = -1L
 
-    // Không đọc typeSwitch ở đây: khi khởi tạo thuộc tính, view chưa được findViewById.
     private var typeId = DBHelper.TYPE_EXPENSE
     private var listParentCategory: List<WalletCategory> = emptyList()
+
+    private val addCategoryLauncher = registerForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        if (result.resultCode != RESULT_OK) return@registerForActivityResult
+        val data = result.data ?: return@registerForActivityResult
+        val newCategoryId = data.getLongExtra(AddCategoryAct.EXTRA_CATEGORY_ID, -1L)
+        val newTypeId = data.getIntExtra(AddCategoryAct.EXTRA_TYPE_ID, typeId)
+        if (newCategoryId < 0) return@registerForActivityResult
+        typeSwitch.isChecked = newTypeId == DBHelper.TYPE_INCOME
+        loadCategory(newCategoryId)
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -58,21 +72,16 @@ class EditCategoryAct : AppCompatActivity() {
         btnUpdate.setOnClickListener { saveCategory()}
         btnCancel.setOnClickListener { finish() }
         btnDelete.setOnClickListener { delCategory(categoryId)}
+        findViewById<TextView>(R.id.btnAddCategory).setOnClickListener {
+            addCategoryLauncher.launch(
+                Intent(this, AddCategoryAct::class.java)
+                    .putExtra(AddCategoryAct.EXTRA_INITIAL_TYPE_ID, typeId)
+            )
+        }
     }
 
     fun loadCategory(selectedCategoryID: Long? = null){
         typeId = if (typeSwitch.isChecked) DBHelper.TYPE_INCOME else DBHelper.TYPE_EXPENSE
-        val editingCategory = originalCategory
-        if (editingCategory != null && editingCategory.parentId == null) {
-            listParentCategory = emptyList()
-            catspinner.adapter = ArrayAdapter(
-                this,
-                android.R.layout.simple_spinner_item,
-                listOf(editingCategory.name)
-            ).apply { setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item) }
-            catspinner.isEnabled = false
-            return
-        }
         catspinner.isEnabled = true
 
         listParentCategory = dbHelper.getParentCategories(typeId).filter { it.id != categoryId }
@@ -96,8 +105,7 @@ class EditCategoryAct : AppCompatActivity() {
             .firstOrNull { catLogoSpinner.adapter.getItem(it) == category.iconName } ?: 0
         catLogoSpinner.setSelection(logoIndex)
 
-        val hasChildren = dbHelper.getCategoriesByType(category.typeId).any { it.parentId == category.id }
-        typeSwitch.isEnabled = !hasChildren
+        typeSwitch.isEnabled = true
     }
 
     private fun saveCategory() {
@@ -107,12 +115,8 @@ class EditCategoryAct : AppCompatActivity() {
             Toast.makeText(this, R.string.msg_enter_category_name, Toast.LENGTH_SHORT).show()
             return
         }
-        val parentId = if (originalCategory?.parentId == null) {
-            null
-        } else {
-            val position = catspinner.selectedItemPosition
-            if (position > 0) listParentCategory[position - 1].id else null
-        }
+        val position = catspinner.selectedItemPosition
+        val parentId = if (position > 0) listParentCategory[position - 1].id else null
 
         val isNameExisted = dbHelper.getCategoriesByType(typeId).any {
             it.id != categoryId && it.parentId == parentId && it.name.equals(name, ignoreCase = true)

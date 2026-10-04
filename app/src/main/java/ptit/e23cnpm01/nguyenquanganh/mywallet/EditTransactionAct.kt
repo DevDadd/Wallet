@@ -12,6 +12,7 @@ import android.widget.Toast
 import androidx.annotation.StringRes
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
+import androidx.activity.result.contract.ActivityResultContracts
 import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Locale
@@ -27,6 +28,18 @@ class EditTransactionAct : AppCompatActivity() {
     private var categories: List<WalletCategory> = emptyList()
     private var transactionId = -1L
     private var originalTransaction: WalletTransaction? = null
+
+    private val addCategoryLauncher = registerForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        if (result.resultCode != RESULT_OK) return@registerForActivityResult
+        val data = result.data ?: return@registerForActivityResult
+        val categoryId = data.getLongExtra(AddCategoryAct.EXTRA_CATEGORY_ID, -1L)
+        val typeId = data.getIntExtra(AddCategoryAct.EXTRA_TYPE_ID, DBHelper.TYPE_EXPENSE)
+        if (categoryId < 0) return@registerForActivityResult
+        typeSwitch.isChecked = typeId == DBHelper.TYPE_INCOME
+        loadCategories(categoryId)
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -56,6 +69,13 @@ class EditTransactionAct : AppCompatActivity() {
         findViewById<Button>(R.id.btnUpdateTransaction).setOnClickListener { updateTransaction() }
         findViewById<Button>(R.id.btnDeleteTransaction).setOnClickListener { confirmDelete() }
         findViewById<Button>(R.id.btnCancelEditTransaction).setOnClickListener { finish() }
+        findViewById<android.widget.TextView>(R.id.btnAddEditCategory).setOnClickListener {
+            val typeId = if (typeSwitch.isChecked) DBHelper.TYPE_INCOME else DBHelper.TYPE_EXPENSE
+            addCategoryLauncher.launch(
+                Intent(this, AddCategoryAct::class.java)
+                    .putExtra(AddCategoryAct.EXTRA_INITIAL_TYPE_ID, typeId)
+            )
+        }
     }
 
     private fun fillTransaction(transaction: WalletTransaction) {

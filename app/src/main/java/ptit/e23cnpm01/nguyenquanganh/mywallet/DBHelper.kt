@@ -28,10 +28,6 @@ class DBHelper(context: Context) : SQLiteOpenHelper(
 
     fun getTotalExpenseByDate(date: String): Double = getTotalAmountByType(date, TYPE_EXPENSE)
 
-    fun getTotalIncome(date: String): Double = getTotalIncomeByDate(date)
-
-    fun getTotalExpense(date: String): Double = getTotalExpenseByDate(date)
-
     fun getTransactionsByDate(date: String): List<WalletTransaction> {
         val sql = """
             SELECT tr.id, tr.date, tr.amount, tr.note, tr.idCategory AS category_id,
@@ -66,9 +62,6 @@ class DBHelper(context: Context) : SQLiteOpenHelper(
         }
     }
 
-    fun getTransactionItemsByDate(date: String): List<WalletTransaction> =
-        getTransactionsByDate(date)
-
     fun getTransactionById(transactionId: Long): WalletTransaction? {
         val sql = """
             SELECT tr.id, tr.date, tr.amount, tr.note, tr.idCategory AS category_id,
@@ -96,7 +89,6 @@ class DBHelper(context: Context) : SQLiteOpenHelper(
     fun getCategoriesByType(typeId: Int): List<WalletCategory> =
         queryCategories("WHERE idType = ?", arrayOf(typeId.toString()))
 
-    /** Danh sách mục cha (idParent = NULL). Truyền typeId để chỉ lấy mục thu hoặc mục chi. */
     fun getParentCategories(typeId: Int? = null): List<WalletCategory> =
         if (typeId == null) {
             queryCategories("WHERE idParent IS NULL")
@@ -189,12 +181,6 @@ class DBHelper(context: Context) : SQLiteOpenHelper(
         }
     }
 
-    fun getLatestTransactionDate(): String? =
-        readableDatabase.rawQuery("SELECT MAX(date) AS latest_date FROM tblTransaction", null)
-            .use { cursor ->
-                if (cursor.moveToFirst() && !cursor.isNull(0)) cursor.getString(0) else null
-            }
-
     fun getParentCategoryIds(categoryId: Long): List<Long> {
         val parentIds = mutableListOf<Long>()
         var currentId = categoryId
@@ -267,18 +253,34 @@ class DBHelper(context: Context) : SQLiteOpenHelper(
         note: String?,
         parentId: Long?,
         typeId: Int
-    ): Int = writableDatabase.update(
-        "tblCategory",
-        ContentValues().apply {
-            put("name", name)
-            put("icon", iconName)
-            put("note", note)
-            if (parentId == null) putNull("idParent") else put("idParent", parentId)
-            put("idType", typeId)
-        },
-        "id = ?",
-        arrayOf(categoryId.toString())
-    )
+    ): Int {
+        val db = writableDatabase
+        db.beginTransaction()
+        return try {
+            val updated = db.update(
+                "tblCategory",
+                ContentValues().apply {
+                    put("name", name)
+                    put("icon", iconName)
+                    put("note", note)
+                    if (parentId == null) putNull("idParent") else put("idParent", parentId)
+                    put("idType", typeId)
+                },
+                "id = ?",
+                arrayOf(categoryId.toString())
+            )
+            if (updated > 0) {
+                db.execSQL(
+                    "UPDATE tblCategory SET idType = ? WHERE idParent = ?",
+                    arrayOf(typeId, categoryId)
+                )
+                db.setTransactionSuccessful()
+            }
+            updated
+        } finally {
+            db.endTransaction()
+        }
+    }
 
     fun updateTransaction(
         transactionId: Long,
@@ -376,9 +378,6 @@ class DBHelper(context: Context) : SQLiteOpenHelper(
             SQLiteDatabase.CONFLICT_REPLACE
         )
     }
-
-    fun getDisplayedDate(): String? = getSetting(SETTING_DISPLAYED_DATE)
-
     fun setDisplayedDate(date: String) = setSetting(SETTING_DISPLAYED_DATE, date)
 
     fun getHasOpenedCategoryList(): Boolean = getSetting(SETTING_HAS_OPENED_CATEGORY_LIST) == "1"

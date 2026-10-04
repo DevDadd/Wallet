@@ -71,6 +71,7 @@
                 android:background="@android:drawable/editbox_background" />
 
             <TextView
+                android:id="@+id/btnAddEditCategory"
                 android:layout_width="40dp"
                 android:layout_height="56dp"
                 android:gravity="center"
