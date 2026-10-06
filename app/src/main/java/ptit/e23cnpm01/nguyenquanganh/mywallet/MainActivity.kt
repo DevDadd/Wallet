@@ -17,7 +17,6 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun showTodaySummary() {
-        // tblTransaction.date trong database có dạng yyyy-MM-dd.
         val databaseDate = SimpleDateFormat("yyyy-MM-dd", Locale.US).format(Date())
         val displayDate = SimpleDateFormat("dd/MM/yyyy", Locale("vi", "VN")).format(Date())
 

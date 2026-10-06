@@ -296,7 +296,6 @@ class DBHelper(context: Context) : SQLiteOpenHelper(
                 arrayOf(categoryId.toString())
             )
             if (updated > 0) {
-                // Đổi loại cho toàn bộ mục con, cháu... (mục cha có thể đã được chuyển vào mục khác)
                 db.execSQL(
                     """
                     WITH RECURSIVE descendants(id) AS (
@@ -334,7 +333,6 @@ class DBHelper(context: Context) : SQLiteOpenHelper(
         "id = ?",
         arrayOf(transactionId.toString())
     )
-
 
     fun deleteCategory(categoryId: Long): Int {
         val sql = """

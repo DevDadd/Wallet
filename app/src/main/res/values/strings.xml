@@ -1,7 +1,6 @@
 <resources>
     <string name="app_name">mywallet</string>
 
-    <!-- Dùng chung -->
     <string name="spinner_choose">-- Chọn --</string>
     <string name="action_delete">Xóa</string>
     <string name="action_cancel">Hủy</string>
@@ -10,7 +9,6 @@
     <string name="msg_amount_positive">Số tiền phải lớn hơn 0</string>
     <string name="msg_invalid_date">Hãy chọn ngày hợp lệ</string>
 
-    <!-- Trang chủ -->
     <string name="home_title_date">Ngày %1$s</string>
     <string name="home_total_income">Tổng thu của ngày\n%1$s</string>
     <string name="home_total_expense">Tổng chi của ngày\n%1$s</string>
@@ -30,19 +28,15 @@
         <item>CN</item>
     </string-array>
 
-    <!-- Lịch tháng -->
     <string name="month_title">Tháng %1$d/%2$d</string>
     <string name="month_back_desc">Quay lại</string>
 
-    <!-- Màn hình cũ MainActivity -->
     <string name="main_total_income">Tổng thu\n%1$s</string>
     <string name="main_total_expense">Tổng chi\n%1$s</string>
 
-    <!-- Sửa giao dịch -->
     <string name="msg_transaction_not_found">Không tìm thấy giao dịch</string>
     <string name="dialog_delete_transaction">Xóa giao dịch này?</string>
 
-    <!-- Thêm mục -->
     <string name="spinner_no_parent">-- Không chọn (tạo mục cha) --</string>
     <string name="title_add_income_category">Thêm mục thu</string>
     <string name="title_add_expense_category">Thêm mục chi</string>
@@ -54,7 +48,6 @@
     <string name="msg_category_name_existed">Tên mục đã tồn tại</string>
     <string name="msg_enter_category_name">Hãy nhập tên mục</string>
 
-    <!-- Phần tử đầu là logo mặc định, lưu vào DB là default.png -->
     <string-array name="category_logos">
         <item>Mặc định</item>
         <item>food.png</item>

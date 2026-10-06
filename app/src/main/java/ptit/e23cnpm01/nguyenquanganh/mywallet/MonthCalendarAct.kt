@@ -25,7 +25,6 @@ class MonthCalendarAct : AppCompatActivity() {
     private val databaseDateFormat = SimpleDateFormat("yyyy-MM-dd", Locale.US)
     private var selectedDate: String = ""
 
-    // Ngày 1 của tháng đang hiển thị
     private val displayedMonth: Calendar = Calendar.getInstance()
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -59,7 +58,6 @@ class MonthCalendarAct : AppCompatActivity() {
 
     override fun dispatchTouchEvent(event: MotionEvent): Boolean {
         if (gestureDetector.onTouchEvent(event)) {
-            // Đã nhận là thao tác vuốt: hủy chạm để ô ngày bên dưới không bị bấm nhầm
             super.dispatchTouchEvent(MotionEvent.obtain(event).apply { action = MotionEvent.ACTION_CANCEL })
             return true
         }

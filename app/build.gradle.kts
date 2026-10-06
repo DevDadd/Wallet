@@ -7,7 +7,6 @@ android {
     namespace = "ptit.e23cnpm01.nguyenquanganh.mywallet"
     compileSdk = 35
 
-    // Database mẫu hiện được đặt tại app/assets/mywallet.db.
     sourceSets {
         getByName("main") {
             assets.srcDirs("assets")

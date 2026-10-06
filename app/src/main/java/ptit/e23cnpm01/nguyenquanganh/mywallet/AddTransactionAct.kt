@@ -39,7 +39,6 @@ class AddTransactionAct : AppCompatActivity() {
         finish()
     }
 
-
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.add_transaction)
@@ -164,7 +163,6 @@ class AddTransactionAct : AppCompatActivity() {
     private fun showMessage(@StringRes message: Int) {
         Toast.makeText(this, message, Toast.LENGTH_SHORT).show()
     }
-
 
     override fun onDestroy() {
         dbHelper.close()
