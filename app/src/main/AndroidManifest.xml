@@ -25,6 +25,9 @@
             android:name=".EditTransactionAct"
             android:exported="false" />
         <activity
+            android:name=".MonthCalendarAct"
+            android:exported="false" />
+        <activity
             android:name=".HomePageAct"
             android:exported="true">
             <intent-filter>

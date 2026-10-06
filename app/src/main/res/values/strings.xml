@@ -20,6 +20,19 @@
     <string name="home_category_edit_desc">Sửa mục %1$s</string>
     <string name="home_transaction_label">• %1$s</string>
     <string name="home_transaction_edit_desc">Sửa giao dịch %1$s</string>
+    <string-array name="home_week_day_names">
+        <item>Thứ 2</item>
+        <item>Thứ 3</item>
+        <item>Thứ 4</item>
+        <item>Thứ 5</item>
+        <item>Thứ 6</item>
+        <item>Thứ 7</item>
+        <item>CN</item>
+    </string-array>
+
+    <!-- Lịch tháng -->
+    <string name="month_title">Tháng %1$d/%2$d</string>
+    <string name="month_back_desc">Quay lại</string>
 
     <!-- Màn hình cũ MainActivity -->
     <string name="main_total_income">Tổng thu\n%1$s</string>

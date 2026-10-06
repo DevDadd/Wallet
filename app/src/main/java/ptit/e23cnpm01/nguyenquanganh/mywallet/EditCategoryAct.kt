@@ -84,11 +84,21 @@ class EditCategoryAct : AppCompatActivity() {
         typeId = if (typeSwitch.isChecked) DBHelper.TYPE_INCOME else DBHelper.TYPE_EXPENSE
         catspinner.isEnabled = true
 
-        listParentCategory = dbHelper.getParentCategories(typeId).filter { it.id != categoryId }
+        val childrenByParent = dbHelper.getCategoriesByType(typeId).groupBy { it.parentId }
+        val parentOptions = mutableListOf<Pair<WalletCategory, Int>>()
+        fun addOption(category: WalletCategory, level: Int) {
+            if (category.id == categoryId) return
+            parentOptions.add(category to level)
+            childrenByParent[category.id].orEmpty().forEach { addOption(it, level + 1) }
+        }
+        childrenByParent[null].orEmpty().forEach { addOption(it, 0) }
+
+        listParentCategory = parentOptions.map { it.first }
         catspinner.adapter = ArrayAdapter(
             this,
             android.R.layout.simple_spinner_item,
-            listOf(getString(R.string.spinner_choose)) + listParentCategory.map { it.name }
+            listOf(getString(R.string.spinner_choose)) +
+                parentOptions.map { (category, level) -> "    ".repeat(level) + category.name }
         ).apply { setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item) }
         val targetId = selectedCategoryID ?: originalCategory?.takeIf { it.typeId == typeId }?.parentId
         val selectedIndex = listParentCategory.indexOfFirst { it.id == targetId }

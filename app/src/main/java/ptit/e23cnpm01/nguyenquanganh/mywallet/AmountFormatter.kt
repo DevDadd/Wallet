@@ -24,4 +24,5 @@ object AmountFormatter {
         }
         return compactFormat.format(value) + suffix
     }
+    fun formatOrBlank(amount: Double): String = if (amount == 0.0) "" else format(amount)
 }

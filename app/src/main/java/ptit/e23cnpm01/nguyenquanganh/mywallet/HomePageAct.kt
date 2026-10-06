@@ -14,6 +14,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import java.text.Collator
 import java.text.SimpleDateFormat
+import java.util.Calendar
 import java.util.Date
 import java.util.Locale
 
@@ -24,6 +25,7 @@ class HomePageAct : AppCompatActivity() {
     lateinit var dbHelper: DBHelper
     private lateinit var titleView: TextView
     private lateinit var listContainer: LinearLayout
+    private lateinit var weekBar: LinearLayout
 
     private val expandedCategoryIds = mutableSetOf<Long>()
     private var useFrequencyOrder = false
@@ -71,6 +73,16 @@ class HomePageAct : AppCompatActivity() {
         selectCategory(data?.getLongExtra(AddTransactionAct.EXTRA_CATEGORY_ID, -1L) ?: -1L)
     }
 
+    private val monthCalendarLauncher = registerForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        if (result.resultCode != RESULT_OK) return@registerForActivityResult
+        val date = result.data?.getStringExtra(MonthCalendarAct.EXTRA_SELECTED_DATE)
+            ?: return@registerForActivityResult
+        showDate(date)
+        selectedCategoryId = null
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
@@ -79,18 +91,24 @@ class HomePageAct : AppCompatActivity() {
 
         dbHelper = DBHelper(this)
         useFrequencyOrder = dbHelper.getHasOpenedCategoryList()
-        // Mỗi lần mở ứng dụng bắt đầu từ ngày hiện tại, không khôi phục ngày xem cũ.
         displayedDatabaseDate = databaseDateFormat.format(Date())
 
         titleView = findViewById(R.id.title)
         totalIncome = findViewById(R.id.totalIncome)
         totalOutcome = findViewById(R.id.totalOutcome)
         listContainer = findViewById(R.id.transactionList)
+        weekBar = findViewById(R.id.weekBar)
 
         findViewById<TextView>(R.id.addTransactionButton).setOnClickListener {
             addTransactionLauncher.launch(
                 Intent(this, AddTransactionAct::class.java)
                     .putExtra(AddTransactionAct.EXTRA_INITIAL_DATE, displayedDatabaseDate)
+            )
+        }
+        findViewById<View>(R.id.button).setOnClickListener {
+            monthCalendarLauncher.launch(
+                Intent(this, MonthCalendarAct::class.java)
+                    .putExtra(MonthCalendarAct.EXTRA_INITIAL_DATE, displayedDatabaseDate)
             )
         }
     }
@@ -123,6 +141,7 @@ class HomePageAct : AppCompatActivity() {
         titleView.text = getString(R.string.home_title_date, displayedDate)
         totalIncome.text = getString(R.string.home_total_income, formatAmount(dbHelper.getTotalIncomeByDate(today)))
         totalOutcome.text = getString(R.string.home_total_expense, formatAmount(dbHelper.getTotalExpenseByDate(today)))
+        renderWeekBar(today)
 
         categories = dbHelper.getCategoriesByType(DBHelper.TYPE_INCOME) +
             dbHelper.getCategoriesByType(DBHelper.TYPE_EXPENSE)
@@ -131,6 +150,38 @@ class HomePageAct : AppCompatActivity() {
         transactionsByCategory = dbHelper.getTransactionsByDate(today).groupBy { it.categoryId }
 
         renderCategoryList()
+    }
+
+    private fun renderWeekBar(selectedDate: String) {
+        weekBar.removeAllViews()
+        val dayNames = resources.getStringArray(R.array.home_week_day_names)
+
+        val calendar = Calendar.getInstance().apply {
+            time = runCatching { databaseDateFormat.parse(selectedDate) }.getOrNull() ?: Date()
+            add(Calendar.DAY_OF_MONTH, -((get(Calendar.DAY_OF_WEEK) + 5) % 7))
+        }
+
+        dayNames.forEach { dayName ->
+            val date = databaseDateFormat.format(calendar.time)
+            val income = dbHelper.getTotalIncomeByDate(date)
+            val expense = dbHelper.getTotalExpenseByDate(date)
+
+            weekBar.addView(
+                layoutInflater.inflate(R.layout.item_home_week_day, weekBar, false).apply {
+                    if (date == selectedDate) setBackgroundResource(R.drawable.bg_week_day_selected)
+                    setOnClickListener {
+                        if (date == displayedDatabaseDate) return@setOnClickListener
+                        showDate(date)
+                        selectedCategoryId = null
+                        showTodaySummary()
+                    }
+                    findViewById<TextView>(R.id.tvWeekDayName).text = dayName
+                    findViewById<TextView>(R.id.tvWeekDayIncome).text = AmountFormatter.formatOrBlank(income)
+                    findViewById<TextView>(R.id.tvWeekDayExpense).text = AmountFormatter.formatOrBlank(expense)
+                }
+            )
+            calendar.add(Calendar.DAY_OF_MONTH, 1)
+        }
     }
 
     private fun renderCategoryList() {

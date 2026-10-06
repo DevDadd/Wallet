@@ -199,6 +199,32 @@ class DBHelper(context: Context) : SQLiteOpenHelper(
         return parentIds
     }
 
+    fun getDailyTotalsBetween(startDate: String, endDate: String): Map<String, DailyTotal> {
+        val sql = """
+            SELECT tr.date AS date,
+                   COALESCE(SUM(CASE WHEN c.idType = ? THEN tr.amount END), 0) AS income,
+                   COALESCE(SUM(CASE WHEN c.idType = ? THEN tr.amount END), 0) AS expense
+            FROM tblTransaction AS tr
+            INNER JOIN tblCategory AS c ON c.id = tr.idCategory
+            WHERE tr.date BETWEEN ? AND ?
+            GROUP BY tr.date
+        """.trimIndent()
+        val args = arrayOf(TYPE_INCOME.toString(), TYPE_EXPENSE.toString(), startDate, endDate)
+
+        return readableDatabase.rawQuery(sql, args).use { cursor ->
+            val totals = mutableMapOf<String, DailyTotal>()
+            while (cursor.moveToNext()) {
+                totals[cursor.getString(cursor.getColumnIndexOrThrow("date"))] = DailyTotal(
+                    income = cursor.getDouble(cursor.getColumnIndexOrThrow("income")),
+                    expense = cursor.getDouble(cursor.getColumnIndexOrThrow("expense"))
+                )
+            }
+            totals
+        }
+    }
+
+    data class DailyTotal(val income: Double, val expense: Double)
+
     private fun getTotalAmountByType(date: String, typeId: Int): Double {
         val sql = """
             SELECT COALESCE(SUM(tr.amount), 0) AS total
@@ -270,9 +296,18 @@ class DBHelper(context: Context) : SQLiteOpenHelper(
                 arrayOf(categoryId.toString())
             )
             if (updated > 0) {
+                // Đổi loại cho toàn bộ mục con, cháu... (mục cha có thể đã được chuyển vào mục khác)
                 db.execSQL(
-                    "UPDATE tblCategory SET idType = ? WHERE idParent = ?",
-                    arrayOf(typeId, categoryId)
+                    """
+                    WITH RECURSIVE descendants(id) AS (
+                        SELECT id FROM tblCategory WHERE idParent = ?
+                        UNION ALL
+                        SELECT c.id FROM tblCategory AS c
+                        INNER JOIN descendants AS d ON c.idParent = d.id
+                    )
+                    UPDATE tblCategory SET idType = ? WHERE id IN (SELECT id FROM descendants)
+                    """.trimIndent(),
+                    arrayOf(categoryId, typeId)
                 )
                 db.setTransactionSuccessful()
             }
